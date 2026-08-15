@@ -1,10 +1,10 @@
-# Ecori Agentic Payment — MBE Corpilot AI
+# Ecori Agentic Payment — MBE Corp-Ai-Lot
 
 Submission for the **Build with Gemini XPRIZE — Circle Agentic Economy Prize**.
 
 ## What this is
 
-`ecori_payment_agent.py` is a standalone microservice that gives **Ecori**, one of the AI mentors inside [MBE Corpilot AI](https://mbe-ai-copilot.vercel.app), the ability to autonomously decide when it needs a paid resource and execute a real USDC micropayment — with no human in the loop at checkout.
+`ecori_payment_agent.py` is a standalone microservice that gives **Ecori**, one of the AI mentors inside [MBE Corp-Ai-Lot](https://mbe-ai-copilot.vercel.app), the ability to autonomously decide when it needs a paid resource and execute a real USDC micropayment — with no human in the loop at checkout.
 
 ## How it works
 
@@ -54,4 +54,4 @@ See `.env.example` for the required variable names. No real credentials are comm
 
 ## Part of
 
-[MBE Corpilot AI](https://github.com/barbeltran-design/MBE-Corpilot-AI) — an AI-powered mentoring platform for small businesses and independent professionals.
+[MBE Corp-Ai-Lot]([https://github.com/barbeltran-design/MBE-Corp-Ai-Lot]) — an AI-powered mentoring platform for small businesses and independent professionals.
