@@ -55,3 +55,30 @@ See `.env.example` for the required variable names. No real credentials are comm
 ## Part of
 
 [MBE Corp-Ai-Lot]([https://github.com/barbeltran-design/MBE-Corp-Ai-Lot]) — an AI-powered mentoring platform for small businesses and independent professionals.
+
+## V2 — Recarga automática de tokens de IA (nuevo endpoint `/recargar-ia`)
+
+Caso de uso para el jurado (Centrality + Autonomy): cuando el motor de IA de MBE
+(Gemini → Groq → OpenRouter → DeepSeek) falla por saldo agotado (429 /
+`sin_balance`), la app llama a este servicio y **Ecori decide y paga la recarga
+de créditos del proveedor por sí mismo**, dentro de sus topes fijos
+($1 USD por transacción, $5 USD por día). La app luego **reintenta** la llamada
+al proveedor una sola vez y el usuario recibe su respuesta sin caídas.
+
+```bash
+curl -X POST http://localhost:8080/recargar-ia \
+  -H "Content-Type: application/json" \
+  -d '{"proveedor": "gemini", "estado": "quota_excedida", "pedido_id": "abc-123"}'
+```
+
+Respuesta (si recarga): `{"recarga_ejecutada": true, "proveedor": "gemini",
+"monto_usd": 1.0, "detalle_pago": {...}, "explorer_url": "https://amoy.polygonscan.com/tx/..."}`
+
+- La decisión es determinista por política (proveedor permitido + estado
+  conocido + tope diario); se documenta que en producción puede sustituirse por
+  razonamiento Gemini.
+- El contador diario es en memoria para el sprint; en producción vive en
+  Firestore (`ia_fondos`, `recargas_ia`, `proveedores_saldo`).
+- Deploy: Cloud Run — `gcloud run deploy ecori-agent --source . --region us-central1 --allow-unauthenticated` (la autenticación real la hace la ruta proxy de la app con un secret compartido).
+- Env vars nuevas: `EXPLORER_URL_TEMPLATE` (plantilla del block explorer con `{tx}`).
+

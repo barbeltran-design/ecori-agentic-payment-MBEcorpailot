@@ -262,5 +262,88 @@ def salud():
     return jsonify({"estado": "ok"})
 
 
+# --- V2: recarga de tokens de IA cuando un proveedor se queda sin saldo ---
+# El flujo en MBE Corpilot AI: una llamada a Gemini/Groq/OpenRouter/DeepSeek
+# falla con 429 (quota_excedida) o sin_balance; el servidor de la app pide a
+# Ecori que recargue creditos del proveedor; Ecori decide bajo politica (topes
+# fijos, proveedor permitido) y ejecuta el pago el mismo; luego la app REINTENTA
+# la llamada al proveedor una sola vez.
+
+PROVEEDORES_IA_PERMITIDOS = ["gemini", "groq", "openrouter", "deepseek"]
+
+
+def ecori_dice_recargar(proveedor: str, estado: str) -> dict:
+    """
+    Decision autonoma de Ecori sobre si recargar tokens al proveedor.
+    [Seguro estructura] Reglas deterministicas para el sprint (sin IA) que
+    validan: proveedor permitido, estado conocido y saldo del dia disponible.
+    El nombre del proveedor viene del servidor de la app, nunca del cliente.
+    """
+    if proveedor not in PROVEEDORES_IA_PERMITIDOS:
+        return {"decision": "rechazar", "motivo": "proveedor_no_permitido"}
+    if estado not in ("quota_excedida", "sin_balance"):
+        return {"decision": "rechazar", "motivo": "estado_desconocido"}
+    if not dentro_del_tope(TOPE_POR_TRANSACCION_USD):
+        return {"decision": "rechazar", "motivo": "tope_diario_alcanzado"}
+    return {"decision": "recargar", "motivo": "tokens_del_proveedor_agotados"}
+
+
+@app.route("/recargar-ia", methods=["POST"])
+def manejar_recarga_ia():
+    """
+    Endpoint que la app (ruta /api/agents/ecori/recarga, con auth de Firebase)
+    llama cuando un proveedor de IA falla por saldo. Ecori decide y, si procede,
+    paga la recarga en USDC desde su Agent Wallet. Devuelve la informacion para
+    la tarjeta UX del usuario y el enlace al block explorer.
+    """
+    cuerpo = request.get_json(force=True)
+    proveedor = str(cuerpo.get("proveedor", "")).lower()
+    estado = str(cuerpo.get("estado", "")).lower()
+    pedido_id = str(cuerpo.get("pedido_id", ""))[:64]  # idempotencia del servidor
+
+    decision = ecori_dice_recargar(proveedor, estado)
+
+    if decision["decision"] == "rechazar":
+        return jsonify({
+            "recarga_ejecutada": False,
+            "proveedor": proveedor,
+            "motivo": decision["motivo"],
+        }), 200
+
+    monto_usd = TOPE_POR_TRANSACCION_USD  # sprint: monto fijo dentro del tope
+    motivo = f"Recarga tokens {proveedor}: {pedido_id or 'consulta'}"[:120]
+
+    try:
+        resultado_pago = pagar_con_agent_wallet(monto_usd, motivo)
+        registrar_gasto(monto_usd)
+        return jsonify({
+            "recarga_ejecutada": True,
+            "proveedor": proveedor,
+            "monto_usd": monto_usd,
+            "motivo": motivo,
+            "detalle_pago": resultado_pago,
+            "explorer_url": os.environ.get("EXPLORER_URL_TEMPLATE", "").replace("{tx}", str(resultado_pago.get("tx_id", ""))),
+        })
+    except requests.HTTPError as error:
+        detalle_circle = None
+        if error.response is not None:
+            try:
+                detalle_circle = error.response.json()
+            except ValueError:
+                detalle_circle = error.response.text
+        return jsonify({
+            "recarga_ejecutada": False,
+            "proveedor": proveedor,
+            "error": str(error),
+            "detalle_error_circle": detalle_circle,
+        }), 502
+    except ValueError as error:
+        return jsonify({
+            "recarga_ejecutada": False,
+            "proveedor": proveedor,
+            "error": str(error),
+        }), 502
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
