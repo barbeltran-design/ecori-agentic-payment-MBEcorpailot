@@ -80,5 +80,5 @@ Respuesta (si recarga): `{"recarga_ejecutada": true, "proveedor": "gemini",
 - El contador diario es en memoria para el sprint; en producción vive en
   Firestore (`ia_fondos`, `recargas_ia`, `proveedores_saldo`).
 - Deploy: Cloud Run — `gcloud run deploy ecori-agent --source . --region us-central1 --allow-unauthenticated` (la autenticación real la hace la ruta proxy de la app con un secret compartido).
-- Env vars nuevas: `EXPLORER_URL_TEMPLATE` (plantilla del block explorer con `{tx}`).
+- Env vars nuevas: `EXPLORER_URL_TEMPLATE` (plantilla del block explorer con `{tx}`) y `ECORI_SERVICE_SECRET` (secreto compartido que la app envia en el header `x-ecori-secret`; si no se configura, el servicio no exige validacion).
 

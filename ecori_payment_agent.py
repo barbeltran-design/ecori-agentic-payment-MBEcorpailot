@@ -53,6 +53,18 @@ CIRCLE_WALLET_ID = os.environ.get("CIRCLE_WALLET_ID", "")
 CIRCLE_ENTITY_SECRET = os.environ.get("CIRCLE_ENTITY_SECRET", "")
 CIRCLE_API_BASE = "https://api.circle.com/v1/w3s"  # [Suponiendo] confirma la base URL vigente
 
+# --- Secreto compartido con la app (MBE Corpilot AI) ---
+# La ruta proxy /api/agents/ecori/recarga envia el header x-ecori-secret con
+# este valor. Si no esta configurado, el servicio no exige validacion
+# (comportamiento abierto, util para pruebas locales).
+ECORI_SERVICE_SECRET = os.environ.get("ECORI_SERVICE_SECRET", "")
+
+
+def secret_valido(headers) -> bool:
+    if not ECORI_SERVICE_SECRET:
+        return True
+    return headers.get("x-ecori-secret", "") == ECORI_SERVICE_SECRET
+
 # --- Tope de gasto del agente (regla dura, no negociable por el propio agente) ---
 TOPE_POR_TRANSACCION_USD = 1.00
 TOPE_DIARIO_USD = 5.00
@@ -210,6 +222,8 @@ def manejar_consulta():
     para responder bien, y si decide que si, ejecuta el pago el mismo.
     """
     cuerpo = request.get_json(force=True)
+    if not secret_valido(request.headers):
+        return jsonify({"error": "Credenciales invalidas."}), 401
     pregunta = cuerpo.get("pregunta", "")
 
     necesita_pago = ecori_necesita_dato_premium(pregunta)
@@ -297,6 +311,8 @@ def manejar_recarga_ia():
     la tarjeta UX del usuario y el enlace al block explorer.
     """
     cuerpo = request.get_json(force=True)
+    if not secret_valido(request.headers):
+        return jsonify({"error": "Credenciales invalidas."}), 401
     proveedor = str(cuerpo.get("proveedor", "")).lower()
     estado = str(cuerpo.get("estado", "")).lower()
     pedido_id = str(cuerpo.get("pedido_id", ""))[:64]  # idempotencia del servidor
